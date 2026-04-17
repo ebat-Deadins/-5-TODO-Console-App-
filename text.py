@@ -1,11 +1,9 @@
 import csv
 from pathlib import Path
 
-# Файл хадгалах замыг тодорхойлох
-FILE_PATH = Path(__file__).parent / "tasks.csv"
+FILE_PATH = Path(_file_).parent / "tasks.csv"
 
 def load_tasks():
-    """Файлаас даалгавруудыг уншиж жагсаалт хэлбэрээр буцаах"""
     tasks = []
     if not FILE_PATH.exists():
         return tasks
@@ -17,42 +15,49 @@ def load_tasks():
                 tasks.append({
                     "id": int(row["id"]),
                     "description": row["description"],
-                    "is_done": row["is_done"] == "True"
+                    "is_done": row["is_done"] == "True",
+                    "priority": row.get("priority", "low")
                 })
     except Exception as e:
-        print(f"Файл уншихад алдаа гарлаа: {e}")
+        print(f"Error reading file: {e}")
     return tasks
 
 def save_tasks(tasks):
-    """Жагсаалтыг CSV файл руу хадгалах"""
     with FILE_PATH.open(mode="w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=["id", "description", "is_done"])
+        # Added 'priority' to the fieldnames
+        writer = csv.DictWriter(f, fieldnames=["id", "description", "is_done", "priority"])
         writer.writeheader()
         for t in tasks:
             writer.writerow(t)
 
-def add_task(description: str):
+def add_task(description: str, priority: str):
     tasks = load_tasks()
     new_id = max([t["id"] for t in tasks], default=0) + 1
-    tasks.append({"id": new_id, "description": description, "is_done": False})
+    tasks.append({
+        "id": new_id, 
+        "description": description, 
+        "is_done": False, 
+        "priority": priority
+    })
     save_tasks(tasks)
-    print(f"\n✅ “{description}” (ID: {new_id}) амжилттай нэмэгдлээ.")
+    print(f"Task '{description}' (Priority: {priority}) added with ID: {new_id}")
 
 def list_tasks():
     tasks = load_tasks()
     if not tasks:
-        print("\n📭 Одоогоор даалгавар алга.")
+        print("\nYour task list is empty.")
         return
 
-    # Дуусаагүйг нь эхэнд харуулахын тулд эрэмбэлэх
-    tasks = sorted(tasks, key=lambda x: x["is_done"])
+    # Sort logic: Unfinished tasks first, then High priority before Low priority
+    tasks = sorted(tasks, key=lambda x: (x["is_done"], x["priority"] != "high"))
     
-    print("\n--- ТАНЫ ДААЛГАВРУУД ---")
-    print(f"{'ID':<4} | {'Төлөв':<6} | {'Тайлбар'}")
-    print("-" * 35)
+    print("\n--- YOUR TASKS ---")
+    print(f"{'ID':<4} | {'PRIORITY':<8} | {'STATUS':<8} | {'DESCRIPTION'}")
+    print("-" * 55)
     for t in tasks:
-        status_symbol = "✔" if t["is_done"] else "✗"
-        print(f"{t['id']:<4} | {status_symbol:^6} | {t['description']}")
+        status = "[DONE]" if t["is_done"] else "[ ]"
+        p_label = t["priority"].upper()
+        print(f"{t['id']:<4} | {p_label:<8} | {status:<8} | {t['description']}")
 
 def toggle_task(task_id: int):
     tasks = load_tasks()
@@ -61,62 +66,67 @@ def toggle_task(task_id: int):
         if t["id"] == task_id:
             t["is_done"] = not t["is_done"]
             found = True
-            state = "ДУУССАН" if t["is_done"] else "ДУУСААГҮЙ"
-            print(f"\n🔄 ID {task_id} төлөв: {state}")
+            state = "DONE" if t["is_done"] else "NOT DONE"
+            print(f"Task {task_id} marked as {state}.")
             break
     if found:
         save_tasks(tasks)
     else:
-        print(f"\n❌ {task_id} дугаартай даалгавар олдсонгүй.")
+        print(f"Task with ID {task_id} not found.")
 
 def delete_task(task_id: int):
     tasks = load_tasks()
     filtered = [t for t in tasks if t["id"] != task_id]
     
     if len(tasks) == len(filtered):
-        print(f"\n❌ {task_id} дугаартай даалгавар олдсонгүй.")
+        print(f"Task with ID {task_id} not found.")
     else:
         save_tasks(filtered)
-        print(f"\n🗑 ID {task_id} амжилттай устгагдлаа.")
+        print(f"Task {task_id} deleted successfully.")
 
 def main_menu():
     while True:
-        print("\n" + "="*25)
-        print("   TODO CONSOLE APP")
-        print("="*25)
-        print("1. Жагсаалт харах")
-        print("2. Статус өөрчлөх (Check/Uncheck)")
-        print("3. Шинэ даалгавар нэмэх")
-        print("4. Даалгавар устгах")
-        print("0. Гарах")
+        print("\n" + "="*30)
+        print("      TODO CONSOLE APP")
+        print("="*30)
+        print("1. View Tasks")
+        print("2. Toggle Status (Check/Uncheck)")
+        print("3. Add New Task")
+        print("4. Delete Task")
+        print("0. Exit")
         
-        choice = input("\nСонголт: ").strip()
+        choice = input("\nSelect an option: ").strip()
         
         if choice == "1":
             list_tasks()
         elif choice == "2":
             try:
-                tid = int(input("Даалгаврын ID: "))
+                tid = int(input("Enter Task ID: "))
                 toggle_task(tid)
             except ValueError:
-                print("❗ Алдаа: ID тоо байх ёстой.")
+                print("Error: ID must be a number.")
         elif choice == "3":
-            desc = input("Юу хийх вэ?: ").strip()
+            desc = input("Task description: ").strip()
             if desc:
-                add_task(desc)
+                print("Select Priority:")
+                print("1. High")
+                print("2. Low")
+                p_input = input("Choice (1 or 2): ").strip()
+                priority = "high" if p_input == "1" else "low"
+                add_task(desc, priority)
             else:
-                print("❗ Алдаа: Хоосон утга оруулж болохгүй.")
+                print("Error: Description cannot be empty.")
         elif choice == "4":
             try:
-                tid = int(input("Устгах ID: "))
+                tid = int(input("Enter ID to delete: "))
                 delete_task(tid)
             except ValueError:
-                print("❗ Алдаа: ID тоо байх ёстой.")
+                print("Error: ID must be a number.")
         elif choice == "0":
-            print("Баяртай! Амжилт хүсэе.")
+            print("Goodbye!")
             break
         else:
-            print("❗ Буруу сонголт. Дахин оролдоно уу.")
+            print("Invalid selection. Please try again.")
 
-if __name__ == "__main__":
+if _name_ == "_main_":
     main_menu()
