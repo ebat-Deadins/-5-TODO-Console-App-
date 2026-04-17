@@ -1,3 +1,7 @@
-id,description,is_done
-1,Даалгавар хийх,False
-2,Ном унших,True
+id,description,is_done,priority
+2,Ном унших,True,low
+3,Програмын лаб 5ыг хиинэ,True,low
+4,Dalaig zodno,False,low
+5,sfsdf,False,low
+6,123123123123,False,low
+7,punch monkey o the face,False,high
