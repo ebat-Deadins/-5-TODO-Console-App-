@@ -1,11 +1,15 @@
 import csv
 from pathlib import Path
+import os
+import calendar
+import datetime 
 
 FILE_PATH = Path(__file__).parent / "tasks.csv"
 
 PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 PRIORITY_ICON = {"high": "🔴 HIGH  ", "medium": "🟡 MEDIUM", "low": "🟢 LOW   "}
 
+now = datetime.datetime.now()
 
 def load_tasks():
     tasks = []
@@ -20,29 +24,46 @@ def load_tasks():
                     "id": int(row["id"]),
                     "description": row["description"],
                     "is_done": row["is_done"] == "True",
-                    "priority": row.get("priority", "low")
+                    "priority": row.get("priority", "low"),
+                    "deadline": row.get("deadline", "")   # BUG 1 FIX: was missing, caused deadline to be lost on reload
                 })
     except Exception as e:
         print(f"Error reading file: {e}")
     return tasks
 
+def show_calendar(year, month):
+    cal = calendar.monthcalendar(year, month)
 
+    print(f"""
+╔══════════════════════════════════╗
+║        {calendar.month_name[month].upper()} {year}                ║
+╠════╦════╦════╦════╦════╦════╦════╣
+║ Mo ║ Tu ║ We ║ Th ║ Fr ║ Sa ║ Su ║
+╠════╬════╬════╬════╬════╬════╬════╣""")
+    for week in cal:
+        row = ""
+        for day in week:
+            row += f"║ {str(day).rjust(2) if day != 0 else '  '} "
+        row += "║"
+        print(row)
+    print("╚════╩════╩════╩════╩════╩════╩════╝")
 def save_tasks(tasks):
     with FILE_PATH.open(mode="w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=["id", "description", "is_done", "priority"])
+        writer = csv.DictWriter(f, fieldnames=["id", "description", "is_done", "priority", "deadline"])
         writer.writeheader()
         for t in tasks:
             writer.writerow(t)
 
 
-def add_task(description: str, priority: str):
+def add_task(description: str, priority: str, day: str):
     tasks = load_tasks()
     new_id = max([t["id"] for t in tasks], default=0) + 1
     tasks.append({
         "id": new_id,
         "description": description,
         "is_done": False,
-        "priority": priority
+        "priority": priority,
+        "deadline": day
     })
     save_tasks(tasks)
     icon = PRIORITY_ICON[priority]
@@ -55,17 +76,24 @@ def list_tasks():
         print("\nYour task list is empty.")
         return
 
-    # Sort: Unfinished first → then High → Medium → Low
-    tasks = sorted(tasks, key=lambda x: (x["is_done"], PRIORITY_ORDER.get(x["priority"], 2)))
+    # Sort: 1. ID (date added) → 2. Priority → 3. Deadline soonest first → 4. Undone first
+    tasks = sorted(tasks, key=lambda x: (
+        x["id"],
+        PRIORITY_ORDER.get(x["priority"], 2),
+        x.get("deadline") or "9999-99-99",  # empty deadlines go last
+        x["is_done"]
+    ))
 
     print("\n" + "=" * 60)
-    print(f"{'ID':<4} | {'PRIORITY':<10} | {'STATUS':<8} | {'DESCRIPTION'}")
+    print(f"{'ID':<4} | {'PRIORITY':<10} | {'STATUS':<8} | {'DESCRIPTION'} | {'DEADLINE'}")
     print("-" * 60)
     for t in tasks:
         status = "✅ DONE " if t["is_done"] else "⬜      "
         icon = PRIORITY_ICON.get(t["priority"], "🟢 LOW   ")
-        print(f"{t['id']:<4} | {icon} | {status} | {t['description']}")
+        deadline = t.get("deadline") or "—"
+        print(f"{t['id']:<4} | {icon} | {status} | {t['description']} | {deadline}")
     print("=" * 60)
+    show_calendar(now.year, now.month)
 
 
 def toggle_task(task_id: int):
@@ -110,48 +138,92 @@ def select_priority() -> str:
             return "low"
         else:
             print("❌ Зөвхөн 1, 2, эсвэл 3 оруулна уу!")
+    
+
+def ask_calendar() -> str:
+    print("\nChoose the month and day:")
+    show_calendar(now.year, now.month)
+    # BUG 2 FIX: function had no input prompt and no return — deadline was always None
+    while True:
+        day_input = input(f"Enter day (1-{calendar.monthrange(now.year, now.month)[1]}): ").strip()
+        try:
+            day = int(day_input)
+            if 1 <= day <= calendar.monthrange(now.year, now.month)[1]:
+                return f"{now.year}-{now.month:02d}-{day:02d}"
+            else:
+                print("❌ Invalid day. Please enter a valid day for this month.")
+        except ValueError:
+            print("❌ Please enter a number.")
+
+
+def set_deadline(task_id: int):
+    tasks = load_tasks()
+    for t in tasks:
+        if t["id"] == task_id:
+            deadline = ask_calendar()
+            t["deadline"] = deadline
+            save_tasks(tasks)
+            print(f"📅 Deadline for task {task_id} set to {deadline}.")
+            return
+    print(f"Task with ID {task_id} not found.")
 
 
 def main_menu():
     while True:
+        list_tasks()
         print("\n" + "=" * 30)
-        print("      TODO CONSOLE APP")
-        print("=" * 30)
-        print("1. View Tasks")
-        print("2. Toggle Status (Check/Uncheck)")
-        print("3. Add New Task")
-        print("4. Delete Task")
+        print("1. Toggle Status (Check/Uncheck)")
+        print("2. Add New Task")
+        print("3. Delete Task")
+        print("4. Set Deadline")
         print("0. Exit")
-
-        choice = input("\nSelect an option: ").strip()
-
+        print("=" * 30)
+        choice = input("\nSelect an option: ").strip()    
         if choice == "1":
-            list_tasks()
-        elif choice == "2":
             try:
                 tid = int(input("Enter Task ID: "))
                 toggle_task(tid)
             except ValueError:
                 print("Error: ID must be a number.")
-        elif choice == "3":
+        elif choice == "2":
             desc = input("Task description: ").strip()
             if desc:
                 priority = select_priority()
-                add_task(desc, priority)
+                day = ask_calendar()
+                add_task(desc, priority, day)
             else:
                 print("Error: Description cannot be empty.")
-        elif choice == "4":
+        elif choice == "3":
             try:
                 tid = int(input("Enter ID to delete: "))
                 delete_task(tid)
             except ValueError:
                 print("Error: ID must be a number.")
+        elif choice == "4":
+            try:
+                tid = int(input("Enter Task ID to set deadline: "))
+                set_deadline(tid)
+            except ValueError:
+                print("Error: ID must be a number.")
         elif choice == "0":
             print("Goodbye! 👋")
+            os.system("cls" if os.name == "nt" else "clear")
             break
         else:
             print("Invalid selection. Please try again.")
 
+def show_logo():
+    os.system("cls" if os.name == "nt" else "clear")
+    print("""
+     ████████╗ ██████╗ ██████╗  ██████╗     ██╗     ██╗███████╗████████╗
+     ╚══██╔══╝██╔═══██╗██╔══██╗██╔═══██╗    ██║     ██║██╔════╝╚══██╔══╝
+        ██║   ██║   ██║██║  ██║██║   ██║    ██║     ██║███████╗   ██║   
+        ██║   ██║   ██║██║  ██║██║   ██║    ██║     ██║╚════██║   ██║   
+        ██║   ╚██████╔╝██████╔╝╚██████╔╝    ███████╗██║███████║   ██║   
+        ╚═╝    ╚═════╝ ╚═════╝  ╚═════╝     ╚══════╝╚═╝╚══════╝   ╚═╝                                                                   
+    """)
 
+
+show_logo()
 if __name__ == "__main__":
     main_menu()
