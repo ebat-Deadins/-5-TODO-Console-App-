@@ -9,6 +9,10 @@ FILE_PATH = Path(__file__).parent / "tasks.csv"
 PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 PRIORITY_ICON = {"high": "🔴 HIGH  ", "medium": "🟡 MEDIUM", "low": "🟢 LOW   "}
 
+# ✨ ADDED: ANSI color codes for the glowing today highlight
+RESET = "\033[0m"
+GLOW  = "\033[1;33;43m"  # Bold yellow text on yellow background
+
 now = datetime.datetime.now()
 
 def load_tasks():
@@ -25,7 +29,7 @@ def load_tasks():
                     "description": row["description"],
                     "is_done": row["is_done"] == "True",
                     "priority": row.get("priority", "low"),
-                    "deadline": row.get("deadline", "")   # BUG 1 FIX: was missing, caused deadline to be lost on reload
+                    "deadline": row.get("deadline", "")
                 })
     except Exception as e:
         print(f"Error reading file: {e}")
@@ -43,10 +47,15 @@ def show_calendar(year, month):
     for week in cal:
         row = ""
         for day in week:
-            row += f"║ {str(day).rjust(2) if day != 0 else '  '} "
+            # ✨ CHANGED: added glow highlight for today's date
+            if day != 0 and day == now.day and year == now.year and month == now.month:
+                row += f"║{GLOW}{str(day).rjust(2)}✨{RESET}"
+            else:
+                row += f"║ {str(day).rjust(2) if day != 0 else '  '} "
         row += "║"
         print(row)
     print("╚════╩════╩════╩════╩════╩════╩════╝")
+
 def save_tasks(tasks):
     with FILE_PATH.open(mode="w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=["id", "description", "is_done", "priority", "deadline"])
@@ -76,11 +85,10 @@ def list_tasks():
         print("\nYour task list is empty.")
         return
 
-    # Sort: 1. ID (date added) → 2. Priority → 3. Deadline soonest first → 4. Undone first
     tasks = sorted(tasks, key=lambda x: (
         x["id"],
         PRIORITY_ORDER.get(x["priority"], 2),
-        x.get("deadline") or "9999-99-99",  # empty deadlines go last
+        x.get("deadline") or "9999-99-99",
         x["is_done"]
     ))
 
@@ -143,7 +151,6 @@ def select_priority() -> str:
 def ask_calendar() -> str:
     print("\nChoose the month and day:")
     show_calendar(now.year, now.month)
-    # BUG 2 FIX: function had no input prompt and no return — deadline was always None
     while True:
         day_input = input(f"Enter day (1-{calendar.monthrange(now.year, now.month)[1]}): ").strip()
         try:
