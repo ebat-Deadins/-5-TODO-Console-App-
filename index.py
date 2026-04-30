@@ -14,7 +14,6 @@ RESET = "\033[0m"
 GLOW  = "\033[1;33;43m"  # Bold yellow text on yellow background
 
 now = datetime.datetime.now()
-
 def load_tasks():
     tasks = []
     if not FILE_PATH.exists():
@@ -31,6 +30,18 @@ def load_tasks():
                     "priority": row.get("priority", "low"),
                     "deadline": row.get("deadline", "")
                 })
+
+        Ta, task_id = deadline_check(tasks)   # ← pass tasks in, safe unpack
+        if Ta == 1:
+            for ro in tasks:
+                if ro["id"] == task_id:
+                    ro["deadline"] = "🔥DUE TODAY"
+            save_tasks(tasks)
+        elif Ta == 0:
+            for ro in tasks:
+                if ro["id"] == task_id:
+                    ro["deadline"] = "⏰OVERDUE"
+            save_tasks(tasks)
     except Exception as e:
         print(f"Error reading file: {e}")
     return tasks
@@ -70,7 +81,7 @@ def add_task(description: str, priority: str, day: str):
     tasks.append({
         "id": new_id,
         "description": description,
-        "is_done": False,
+        "is_done": "False",
         "priority": priority,
         "deadline": day
     })
@@ -91,7 +102,6 @@ def list_tasks():
         x.get("deadline") or "9999-99-99",
         x["is_done"]
     ))
-
     print("\n" + "=" * 60)
     print(f"{'ID':<4} | {'PRIORITY':<10} | {'STATUS':<8} | {'DESCRIPTION'} | {'DEADLINE'}")
     print("-" * 60)
@@ -111,7 +121,7 @@ def toggle_task(task_id: int):
         if t["id"] == task_id:
             t["is_done"] = not t["is_done"]
             found = True
-            state = "DONE ✅" if t["is_done"] else "NOT DONE ⬜"
+            state = "DONE ✅" if t["is_done"] == "True" else "NOT DONE ⬜"
             print(f"Task {task_id} marked as {state}.")
             break
     if found:
@@ -150,17 +160,27 @@ def select_priority() -> str:
 
 def ask_calendar() -> str:
     print("\nChoose the month and day:")
-    show_calendar(now.year, now.month)
     while True:
-        day_input = input(f"Enter day (1-{calendar.monthrange(now.year, now.month)[1]}): ").strip()
+        month_input = input(f"Enter month (1-12): ").strip()
+        show_calendar(now.year, int(month_input) if month_input.isdigit() else now.month)
         try:
-            day = int(day_input)
-            if 1 <= day <= calendar.monthrange(now.year, now.month)[1]:
-                return f"{now.year}-{now.month:02d}-{day:02d}"
+            month = int(month_input)
+            if 1 <= month <= 12:
+                break
             else:
-                print("❌ Invalid day. Please enter a valid day for this month.")
+                print("❌ Invalid month. Please enter a number between 1 and 12.")
         except ValueError:
             print("❌ Please enter a number.")
+    day_input = input(f"Enter day (1-{calendar.monthrange(now.year, now.month)[1]}): ").strip()
+    try:
+        day = int(day_input)
+        if 1 <= day <= calendar.monthrange(now.year, now.month)[1]:
+            return f"{now.year}-{month:02d}-{day:02d}"
+        else:
+            print("❌ Invalid day. Please enter a valid day for this month.")
+    except ValueError:
+        print(" Please enter a number.")
+    show_calendar(now.year, month)
 
 
 def set_deadline(task_id: int):
@@ -172,8 +192,16 @@ def set_deadline(task_id: int):
             save_tasks(tasks)
             print(f"📅 Deadline for task {task_id} set to {deadline}.")
             return
-    print(f"Task with ID {task_id} not found.")
+    print(f" ❌ Task with ID {task_id} not found.")
 
+def deadline_check(tasks):          # ← accept tasks, don't call load_tasks()
+    today_str = now.strftime("%Y-%m-%d")
+    for t in tasks:
+        if t.get("deadline") == today_str and t["is_done"] == "False":   # ← "deadline" not "status"
+            return 1, t["id"]
+        elif t.get("deadline") and t.get("deadline") < today_str and t["is_done"] == "False":
+            return 0, t["id"]
+    return None, None               # ← always return a tuple, never None
 
 def main_menu():
     while True:
@@ -210,6 +238,7 @@ def main_menu():
             try:
                 tid = int(input("Enter Task ID to set deadline: "))
                 set_deadline(tid)
+                
             except ValueError:
                 print("Error: ID must be a number.")
         elif choice == "0":
@@ -218,6 +247,7 @@ def main_menu():
             break
         else:
             print("Invalid selection. Please try again.")
+        os.system("cls" if os.name == "nt" else "clear")
 
 def show_logo():
     os.system("cls" if os.name == "nt" else "clear")
