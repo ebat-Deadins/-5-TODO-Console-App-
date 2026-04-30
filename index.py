@@ -31,16 +31,7 @@ def load_tasks():
                     "deadline": row.get("deadline", "")
                 })
 
-        Ta, task_id = deadline_check(tasks)   # ← pass tasks in, safe unpack
-        if Ta == 1:
-            for ro in tasks:
-                if ro["id"] == task_id:
-                    ro["deadline"] = "🔥DUE TODAY"
-            save_tasks(tasks)
-        elif Ta == 0:
-            for ro in tasks:
-                if ro["id"] == task_id:
-                    ro["deadline"] = "⏰OVERDUE"
+        if deadline_check(tasks):
             save_tasks(tasks)
     except Exception as e:
         print(f"Error reading file: {e}")
@@ -194,15 +185,20 @@ def set_deadline(task_id: int):
             return
     print(f" ❌ Task with ID {task_id} not found.")
 
-def deadline_check(tasks):          # ← accept tasks, don't call load_tasks()
+def deadline_check(tasks):
     today_str = now.strftime("%Y-%m-%d")
+    changed = False
     for t in tasks:
-        if t.get("deadline") == today_str and t["is_done"] == "False":   # ← "deadline" not "status"
-            return 1, t["id"]
-        elif t.get("deadline") and t.get("deadline") < today_str and t["is_done"] == "False":
-            return 0, t["id"]
-    return None, None               # ← always return a tuple, never None
-
+        if not t.get("deadline") or t["is_done"] == True:
+            continue
+        if t["deadline"] == today_str:
+            t["deadline"] = "🔥DUE TODAY"
+            changed = True
+        elif t["deadline"] < today_str:
+            t["deadline"] = "⏰OVERDUE"
+            changed = True
+    return changed  # just a bool now — tasks are mutated directly
+    
 def main_menu():
     while True:
         list_tasks()
