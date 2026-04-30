@@ -30,9 +30,6 @@ def load_tasks():
                     "priority": row.get("priority", "low"),
                     "deadline": row.get("deadline", "")
                 })
-
-        if deadline_check(tasks):
-            save_tasks(tasks)
     except Exception as e:
         print(f"Error reading file: {e}")
     return tasks
@@ -197,7 +194,8 @@ def deadline_check(tasks):
         elif t["deadline"] < today_str:
             t["deadline"] = "⏰OVERDUE"
             changed = True
-    return changed  # just a bool now — tasks are mutated directly
+    if changed:
+        save_tasks(tasks)
     
 def main_menu():
     while True:
