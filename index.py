@@ -4,7 +4,7 @@ import os
 import calendar
 import datetime 
 
-FILE_PATH = Path(__file__).parent / "tasks.csv"
+FILE_PATH = Path(__file__).parent / "tasks.csv" # C:\Users\Batbileg-PC\-5-TODO-Console-App--main
 
 PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 PRIORITY_ICON = {"high": "🔴 HIGH  ", "medium": "🟡 MEDIUM", "low": "🟢 LOW   "}
@@ -13,23 +13,24 @@ PRIORITY_ICON = {"high": "🔴 HIGH  ", "medium": "🟡 MEDIUM", "low": "🟢 LO
 RESET = "\033[0m"
 GLOW  = "\033[1;33;43m"  # Bold yellow text on yellow background
 
-now = datetime.datetime.now()
+NOW = datetime.datetime.now() #2026-05-01 00:18:43.123456
+
 def load_tasks():
     tasks = []
     if not FILE_PATH.exists():
         return tasks
-
     try:
         with FILE_PATH.open(mode="r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
             for row in reader:
-                tasks.append({
+                tasks.append({ # [{},{},{},{},{}]
                     "id": int(row["id"]),
                     "description": row["description"],
                     "is_done": row["is_done"] == "True",
                     "priority": row.get("priority", "low"),
                     "deadline": row.get("deadline", "")
                 })
+            deadline_check(tasks)  # Check deadlines on load
     except Exception as e:
         print(f"Error reading file: {e}")
     return tasks
@@ -47,7 +48,7 @@ def show_calendar(year, month):
         row = ""
         for day in week:
             # ✨ CHANGED: added glow highlight for today's date
-            if day != 0 and day == now.day and year == now.year and month == now.month:
+            if day != 0 and day == NOW.day and year == NOW.year and month == NOW.month:
                 row += f"║{GLOW}{str(day).rjust(2)}✨{RESET}"
             else:
                 row += f"║ {str(day).rjust(2) if day != 0 else '  '} "
@@ -95,11 +96,11 @@ def list_tasks():
     print("-" * 60)
     for t in tasks:
         status = "✅ DONE " if t["is_done"] else "⬜      "
-        icon = PRIORITY_ICON.get(t["priority"], "🟢 LOW   ")
+        icon = PRIORITY_ICON.get(t["priority"], "🟢 LOW  ")
         deadline = t.get("deadline") or "—"
         print(f"{t['id']:<4} | {icon} | {status} | {t['description']} | {deadline}")
     print("=" * 60)
-    show_calendar(now.year, now.month)
+    show_calendar(NOW.year, NOW.month)
 
 
 def toggle_task(task_id: int):
@@ -150,7 +151,7 @@ def ask_calendar() -> str:
     print("\nChoose the month and day:")
     while True:
         month_input = input(f"Enter month (1-12): ").strip()
-        show_calendar(now.year, int(month_input) if month_input.isdigit() else now.month)
+        show_calendar(NOW.year, int(month_input) if month_input.isdigit() else NOW.month)
         try:
             month = int(month_input)
             if 1 <= month <= 12:
@@ -159,16 +160,16 @@ def ask_calendar() -> str:
                 print("❌ Invalid month. Please enter a number between 1 and 12.")
         except ValueError:
             print("❌ Please enter a number.")
-    day_input = input(f"Enter day (1-{calendar.monthrange(now.year, now.month)[1]}): ").strip()
+    day_input = input(f"Enter day (1-{calendar.monthrange(NOW.year, NOW.month)[1]}): ").strip()
     try:
         day = int(day_input)
-        if 1 <= day <= calendar.monthrange(now.year, now.month)[1]:
-            return f"{now.year}-{month:02d}-{day:02d}"
+        if 1 <= day <= calendar.monthrange(NOW.year, NOW.month)[1]:
+            return f"{NOW.year}-{month:02d}-{day:02d}"
         else:
             print("❌ Invalid day. Please enter a valid day for this month.")
     except ValueError:
         print(" Please enter a number.")
-    show_calendar(now.year, month)
+    show_calendar(NOW.year, month)
 
 
 def set_deadline(task_id: int):
@@ -183,7 +184,7 @@ def set_deadline(task_id: int):
     print(f" ❌ Task with ID {task_id} not found.")
 
 def deadline_check(tasks):
-    today_str = now.strftime("%Y-%m-%d")
+    today_str = NOW.strftime("%Y-%m-%d")
     changed = False
     for t in tasks:
         if not t.get("deadline") or t["is_done"] == True:
@@ -192,7 +193,7 @@ def deadline_check(tasks):
             t["deadline"] = "🔥DUE TODAY"
             changed = True
         elif t["deadline"] < today_str:
-            t["deadline"] = "⏰OVERDUE"
+            t["deadline"] = f"⏰OVERDUE {t['deadline']}"
             changed = True
     if changed:
         save_tasks(tasks)
